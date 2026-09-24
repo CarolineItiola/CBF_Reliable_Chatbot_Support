@@ -1,10 +1,17 @@
 import json
 import os
+import streamlit as st
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+try:
+    api_key = st.secrets["ANTHROPIC_API_KEY"]
+except Exception:
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+
+cache_stats = {"hits": 0, "misses": 0, "tokens_saved": 0}
 
 # ===== SWAP THIS BLOCK FOR YOUR ORGANISATION =====
 ORG_FACTS = """
@@ -84,9 +91,21 @@ def get_response(question, max_retries=3):
         response = client.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
-            system=SYSTEM_PROMPT,
+            system=[
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": question}],
         )
+        read = getattr(response.usage, "cache_read_input_tokens", 0)
+        if read:
+            cache_stats["hits"] += 1
+            cache_stats["tokens_saved"] += read
+        else:
+            cache_stats["misses"] += 1
         raw = response.content[0].text
         start = raw.find("{")
         end = raw.rfind("}") + 1
@@ -104,3 +123,4 @@ if __name__ == "__main__":
         print("needs_human:", result["needs_human"])
     else:
         print("No valid response after 3 attempts.")
+    print("cache:", cache_stats)
