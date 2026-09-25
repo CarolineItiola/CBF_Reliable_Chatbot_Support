@@ -10,6 +10,7 @@ try:
     api_key = st.secrets["ANTHROPIC_API_KEY"]
 except Exception:
     api_key = os.getenv("ANTHROPIC_API_KEY")
+client = Anthropic(api_key=api_key)
 
 cache_stats = {"hits": 0, "misses": 0, "tokens_saved": 0}
 
